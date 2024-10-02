@@ -92,9 +92,9 @@ func getPromptRefined(assessmentBank int, prof string, topic string, subTopic st
 
 	Return the results using this JSON schema: 
 		Assessment = {
-		"Subject": str
-		"Topic": str
-		"Proficiency": str
+		"Subject": %s
+		"Topic": %s
+		"Proficiency": %s
 		"Question": str
 		"Answer": str
 		"AllOptions":[]
@@ -105,7 +105,7 @@ func getPromptRefined(assessmentBank int, prof string, topic string, subTopic st
 	 Return: Array<Assessment>
 	`
 
-	return fmt.Sprint(promptTemplate, assessmentBank, prof, topic, subTopic)
+	return fmt.Sprint(promptTemplate, assessmentBank, prof, topic, subTopic, topic, subTopic, prof)
 
 }
 
@@ -158,6 +158,74 @@ func getAllResponse(resp *genai.GenerateContentResponse) [][]assessmentData {
 
 	return assessmentDataCollection
 }
+
+func tabWriteFile(assessmentDataCollectionFinal [][]assessmentData) {
+	file, err := os.Create("generatedAssessments.csv")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	writer := tabwriter.NewWriter(file, 0, 0, 1, ' ', 0)
+
+	sep := "\t"
+
+	fmt.Fprintln(writer, "Subject"+sep+"Topic"+sep+"Proficiency"+sep+"Complexity"+sep+"Question"+sep+"Option1"+sep+"Option2"+sep+"Option3"+sep+"Option4"+sep+"Answer"+sep+"Reasoning"+sep+"Source")
+
+	for outIdx := range assessmentDataCollectionFinal {
+		for inIdx := range assessmentDataCollectionFinal[outIdx] {
+
+			fmt.Fprintln(writer,
+				assessmentDataCollectionFinal[outIdx][inIdx].Subject+sep+assessmentDataCollectionFinal[outIdx][inIdx].Topic+sep+
+					assessmentDataCollectionFinal[outIdx][inIdx].Proficiency+sep+assessmentDataCollectionFinal[outIdx][inIdx].Complexity+sep+
+					assessmentDataCollectionFinal[outIdx][inIdx].Question+sep+assessmentDataCollectionFinal[outIdx][inIdx].AllOptions[0]+sep+
+					assessmentDataCollectionFinal[outIdx][inIdx].AllOptions[1]+sep+assessmentDataCollectionFinal[outIdx][inIdx].AllOptions[2]+sep+
+					assessmentDataCollectionFinal[outIdx][inIdx].AllOptions[3]+sep+assessmentDataCollectionFinal[outIdx][inIdx].Answer+sep+
+					assessmentDataCollectionFinal[outIdx][inIdx].Reasoning+sep+assessmentDataCollectionFinal[outIdx][inIdx].Source)
+		}
+	}
+
+	writer.Flush()
+}
+func csvWriteFile(assessmentDataCollectionFinal [][]assessmentData) {
+
+	file, err := os.Create("generatedAssessments.csv")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	writer.Comma = ';'
+
+	defer writer.Flush()
+
+	var allDataStringSlice [][]string
+	sep := ";"
+
+	dataStringSlice := []string{"Subject" + sep + "Topic" + sep + "Proficiency" + sep + "Complexity" + sep + "Question" + sep + "Option1" + sep + "Option2" + sep + "Option3" + sep + "Option4" + sep + "Answer" + sep + "Reasoning" + sep + "Source"}
+
+	allDataStringSlice = append(allDataStringSlice, dataStringSlice)
+
+	for outIdx := range assessmentDataCollectionFinal {
+		for inIdx := range assessmentDataCollectionFinal[outIdx] {
+			dataStringSlice := []string{assessmentDataCollectionFinal[outIdx][inIdx].Subject + sep + assessmentDataCollectionFinal[outIdx][inIdx].Topic + sep +
+				assessmentDataCollectionFinal[outIdx][inIdx].Proficiency + sep + assessmentDataCollectionFinal[outIdx][inIdx].Complexity + sep +
+				assessmentDataCollectionFinal[outIdx][inIdx].Question + sep + assessmentDataCollectionFinal[outIdx][inIdx].AllOptions[0] + sep +
+				assessmentDataCollectionFinal[outIdx][inIdx].AllOptions[1] + sep + assessmentDataCollectionFinal[outIdx][inIdx].AllOptions[2] + sep +
+				assessmentDataCollectionFinal[outIdx][inIdx].AllOptions[3] + sep + assessmentDataCollectionFinal[outIdx][inIdx].Answer + sep +
+				assessmentDataCollectionFinal[outIdx][inIdx].Reasoning + sep + assessmentDataCollectionFinal[outIdx][inIdx].Source}
+
+			allDataStringSlice = append(allDataStringSlice, dataStringSlice)
+		}
+	}
+
+	writer.WriteAll(allDataStringSlice)
+
+}
+
 func main() {
 
 	var results []*genai.GenerateContentResponse
@@ -209,32 +277,6 @@ func main() {
 		assessmentDataCollectionFinal = append(assessmentDataCollectionFinal, getAllResponse(results[r])...)
 	}
 
-	file, err := os.Create("generatedAssessments.csv")
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-
-	writer := tabwriter.NewWriter(file, 0, 0, 1, ' ', 0)
-
-	sep := "\t"
-
-	fmt.Fprintln(writer, "Subject"+sep+"Topic"+sep+"Proficiency"+sep+"Complexity"+sep+"Question"+sep+"Option1"+sep+"Option2"+sep+"Option3"+sep+"Option4"+sep+"Answer"+sep+"Reasoning"+sep+"Source")
-
-	for outIdx := range assessmentDataCollectionFinal {
-		for inIdx := range assessmentDataCollectionFinal[outIdx] {
-
-			fmt.Fprintln(writer,
-				assessmentDataCollectionFinal[outIdx][inIdx].Subject+sep+assessmentDataCollectionFinal[outIdx][inIdx].Topic+sep+
-					assessmentDataCollectionFinal[outIdx][inIdx].Proficiency+sep+assessmentDataCollectionFinal[outIdx][inIdx].Complexity+sep+
-					assessmentDataCollectionFinal[outIdx][inIdx].Question+sep+assessmentDataCollectionFinal[outIdx][inIdx].AllOptions[0]+sep+
-					assessmentDataCollectionFinal[outIdx][inIdx].AllOptions[1]+sep+assessmentDataCollectionFinal[outIdx][inIdx].AllOptions[2]+sep+
-					assessmentDataCollectionFinal[outIdx][inIdx].AllOptions[3]+sep+assessmentDataCollectionFinal[outIdx][inIdx].Answer+sep+
-					assessmentDataCollectionFinal[outIdx][inIdx].Reasoning+sep+assessmentDataCollectionFinal[outIdx][inIdx].Source)
-		}
-	}
-
-	writer.Flush()
+	csvWriteFile(assessmentDataCollectionFinal)
 
 }
