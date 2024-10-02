@@ -1,0 +1,4 @@
+_main.go
+*.csv
+*.sum
+*.mod
