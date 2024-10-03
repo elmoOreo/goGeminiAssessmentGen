@@ -14,6 +14,8 @@ import (
 	"google.golang.org/api/option"
 )
 
+type empty struct{}
+
 type assessmentData struct {
 	Subject     string
 	Topic       string
@@ -26,7 +28,7 @@ type assessmentData struct {
 	Source      string
 }
 
-func getPrompt(assessmentBank int, prof string, topic string, subTopic string) string {
+func getPrompt(assessmentBankCount int, prof string, topic string, subTopic string) string {
 
 	promptTemplate := `
 	You are an AI Guru and an expert in AI literature.  You are tasked to generate a set of multiple choice assessments for evaluating a talent.
@@ -61,19 +63,19 @@ func getPrompt(assessmentBank int, prof string, topic string, subTopic string) s
 	 Return: Array<Assessment>
 	`
 
-	return fmt.Sprintf(promptTemplate, assessmentBank, prof, subTopic, topic)
+	return fmt.Sprintf(promptTemplate, assessmentBankCount, prof, subTopic, topic)
 
 }
 
-func getPromptRefined(assessmentBank int, prof string, topic string, subTopic string) string {
+func getPromptRefined(assessmentBankCount int, prof string, topic string, subTopic string) string {
 
 	promptTemplate := `
 	You are an AI Guru and an expert in AI literature.  You are tasked to generate a set of multiple choice assessments for evaluating a talent.
 
 	The talent can belong to one of the following proficiencies in the increasing order either Learner, Practitioner or Specialist 
 	1) Learner      : A Learner is at level 0. A Learner is aware of the concept and has little or minimal practical experience 
-	2) Practitioner : A Practitioner is at level 1 and has more knowledge than a Learner. A Practitioner is knowledgable on the concept anad has meaningful practical experience of implementing the concept.
-	3) Specialist   : A Specialist is at level 2 and has more knowledge than a Practitioner. A Specialist is a GURU on the concept and has great practical experience of implementing the concept.
+	2) Practitioner : A Practitioner is at level 1 and has more knowledge than a Learner. A Practitioner is knowledgable on the concept anad has meaningful practical experience of implementing the concept over a few years.
+	3) Specialist   : A Specialist is at level 2 and has more knowledge than a Practitioner. A Specialist is a GURU on the concept and has meaningful practical experience of implementing the concept over many years.
 
 	Please do not hallucinate, if you are not aware, please say it so in courteous fashion. Please do not share anything that can be construed as harmful. You will be formulating a question and set of possible answers that can be presented for evaluation.
 
@@ -82,13 +84,13 @@ func getPromptRefined(assessmentBank int, prof string, topic string, subTopic st
 	The following will be the steps for each question
 
 	Step 1) Ask a relevant question on the Topic of %s. 
-	Step 2) If the question is a repeat, ask a different relevant question
-	Step 3) For each question generated, List the answer having a maximum length of no more than 5 words to the question.
-	Step 4) For each question generated, Generate 3 other similar answers having a maximum length of no more than 5 words. 
-	Step 5) For each question generated, Return the answers generated in Step 3 and Step 4 as a single list.
-	Step 6) For each question generated, Articulate in detail why the answer in Step 3 is the right answer for the question
-	Step 7) For each question generated, Estimate the complexity of the question in terms of Easy, Medium or Difficult
-	Step 8) For each question generated, Highlight the source if any from which the question was articulated, do not hallucinate, if there are no source to highlight say none
+	Step 2) If the question is a repeat, ask a different relevant question.
+	Step 3) For the question generated, List the answer having a maximum length of no more than 5 words.
+	Step 4) For the question generated, Generate 3 other similar answers having a maximum length of no more than 5 words. 
+	Step 5) For the question generated, Return the answers generated in Step 3 and Step 4 as a single list.
+	Step 6) For the question generated, Articulate in detail why the answer in Step 3 is the right answer.
+	Step 7) For the question generated, Estimate the complexity of the question in terms of Easy, Medium or Difficult.
+	Step 8) For the question generated, Highlight the source if any from which the question was articulated, do not hallucinate, if there are no source to highlight say none.
 
 	Return the results using this JSON schema: 
 		Assessment = {
@@ -105,15 +107,15 @@ func getPromptRefined(assessmentBank int, prof string, topic string, subTopic st
 	 Return: Array<Assessment>
 	`
 
-	return fmt.Sprint(promptTemplate, assessmentBank, prof, topic, subTopic, topic, subTopic, prof)
+	return fmt.Sprint(promptTemplate, assessmentBankCount, prof, topic, subTopic, topic, subTopic, prof)
 
 }
 
-func worker(ctx context.Context, assessmentBank int, prof string, topic string, subTopic string, geminiResponse chan *genai.GenerateContentResponse, wg *sync.WaitGroup) {
+func worker(ctx context.Context, assessmentBankCount int, prof string, topic string, subTopic string, geminiResponse chan *genai.GenerateContentResponse, wg *sync.WaitGroup) {
 
 	defer wg.Done()
 
-	promptString := getPromptRefined(assessmentBank, prof, topic, subTopic)
+	promptString := getPromptRefined(assessmentBankCount, prof, topic, subTopic)
 
 	// Access your API key as an environment variable (see "Set up your API key" above)
 	client, err := genai.NewClient(ctx, option.WithAPIKey(os.Getenv("GEMINI_API_KEY")))
@@ -124,7 +126,7 @@ func worker(ctx context.Context, assessmentBank int, prof string, topic string, 
 
 	model := client.GenerativeModel("gemini-1.5-flash")
 	model.ResponseMIMEType = "application/json"
-	const ChatTemperature float32 = 0.0
+	const ChatTemperature float32 = 0.5
 	temperature := ChatTemperature
 	model.Temperature = &temperature
 
@@ -134,6 +136,34 @@ func worker(ctx context.Context, assessmentBank int, prof string, topic string, 
 	}
 
 	geminiResponse <- resp
+
+}
+
+func worker2(ctx context.Context, tracker chan empty, assessmentBankCount int, chanInputs chan []string, geminiResponse chan *genai.GenerateContentResponse) {
+
+	for chanInput := range chanInputs {
+		promptString := getPromptRefined(assessmentBankCount, chanInput[0], chanInput[1], chanInput[2])
+
+		// Access your API key as an environment variable (see "Set up your API key" above)
+		client, err := genai.NewClient(ctx, option.WithAPIKey(os.Getenv("GEMINI_API_KEY")))
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		model := client.GenerativeModel("gemini-1.5-flash")
+		model.ResponseMIMEType = "application/json"
+
+		resp, err := model.GenerateContent(ctx, genai.Text(promptString))
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		geminiResponse <- resp
+
+		client.Close()
+	}
+	var e empty
+	tracker <- e
 
 }
 
@@ -188,6 +218,7 @@ func tabWriteFile(assessmentDataCollectionFinal [][]assessmentData) {
 
 	writer.Flush()
 }
+
 func csvWriteFile(assessmentDataCollectionFinal [][]assessmentData) {
 
 	file, err := os.Create("generatedAssessments.csv")
@@ -234,7 +265,8 @@ func main() {
 
 	var assessmentDataCollectionFinal [][]assessmentData
 
-	const questionCount int = 10
+	const assessmentBankCount int = 20
+	const goRoutineCount int = 5
 
 	csvfile, err := os.Open("TopicsforAssessmentGeneration.csv")
 	if err != nil {
@@ -253,13 +285,64 @@ func main() {
 	profList = append(profList, "Practitioner")
 	profList = append(profList, "Specialist")
 
-	var wg sync.WaitGroup
 	geminiResponse := make(chan *genai.GenerateContentResponse)
+
+	// begin Implementation 2
+
+	tracker := make(chan empty)
+	chanInputs := make(chan []string)
+	var dataInput []string
+
+	// Create the jobs
+	for i := 0; i < goRoutineCount; i++ {
+		go worker2(ctx, tracker, assessmentBankCount, chanInputs, geminiResponse)
+	}
+
+	//get the completions
+	go func() {
+		for r := range geminiResponse {
+			// printResponse(r)
+			results = append(results, r)
+		}
+		var e empty
+		tracker <- e
+	}()
+
+	for idx := range profList {
+		for recordIteration := range record {
+			dataInput = nil
+			dataInput = append(dataInput, profList[idx])
+			dataInput = append(dataInput, record[recordIteration][0])
+			dataInput = append(dataInput, record[recordIteration][1])
+
+			chanInputs <- dataInput
+
+		}
+	}
+
+	close(chanInputs)
+	for i := 0; i < goRoutineCount; i++ {
+		<-tracker
+	}
+	close(geminiResponse)
+
+	assessmentDataCollectionFinal = nil
+	for r := range results {
+		assessmentDataCollectionFinal = append(assessmentDataCollectionFinal, getAllResponse(results[r])...)
+	}
+
+	csvWriteFile(assessmentDataCollectionFinal)
+
+	// end Implementation 2
+
+	// begin Implementation 1
+
+	/* var wg sync.WaitGroup
 
 	for idx := range profList {
 		for recordIteration := range record {
 			wg.Add(1)
-			go worker(ctx, questionCount, profList[idx], record[recordIteration][0], record[recordIteration][1], geminiResponse, &wg)
+			go worker(ctx, assessmentBankCount, profList[idx], record[recordIteration][0], record[recordIteration][1], geminiResponse, &wg)
 		}
 	}
 
@@ -277,6 +360,8 @@ func main() {
 		assessmentDataCollectionFinal = append(assessmentDataCollectionFinal, getAllResponse(results[r])...)
 	}
 
-	csvWriteFile(assessmentDataCollectionFinal)
+	csvWriteFile(assessmentDataCollectionFinal) */
+
+	// end Implementation 1
 
 }
