@@ -81,18 +81,23 @@ func getPromptRefinedforValidation(allQuizes []assessmentDataforMap) string {
 
 	stepsPrompt := `
 
-	The following are the Questions and the Options
+	The following are the Questions and the Options.
+	Questions are delimited by $$$
+	Options are delimited by ###
 
+	$$$
 	Question %d:
 	%s
-
+	$$$
+	###
 	Options:
 	%s
 	%s
 	%s
 	%s
 	I do not know
-	The right option is not listed`
+	The right option is not listed
+	###`
 
 	for outIdx := 0; outIdx < len(allQuizes); outIdx++ {
 		stepsPromptInit := fmt.Sprintf(stepsPrompt, outIdx, allQuizes[outIdx].Question, allQuizes[outIdx].AllOptions[0],
@@ -930,8 +935,6 @@ func main() {
 	promptforValidationList = append(promptforValidationList, getPromptRefinedforValidation(mismatchedDataString))
 	fmt.Println("Validating Assessments Round 2 Prompt Generation Done")
 
-	time.Sleep(60 * time.Second)
-
 	fmt.Println("Validating Assessments Round 2 Started")
 	allValidatedResultsMap = validateAsessments(ctx, debug, 1, promptforValidationList)
 	fmt.Println("Validating Assessments Round 2 Done")
@@ -941,8 +944,6 @@ func main() {
 	fmt.Println("Updating Maps Round 2 Started")
 	resultsMap, mismatchedDataString = updateMaps(debug, resultsMap, allValidatedResultsMap)
 	fmt.Println("Updating Maps Round 2 Done")
-
-	time.Sleep(60 * time.Second)
 
 	fmt.Println("Round 2 Stats")
 	fmt.Println("----------------------------------------------------")
