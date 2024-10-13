@@ -557,8 +557,7 @@ func updateMaps(debug bool, resultsMap map[string]assessmentDataforMap, allValid
 	return resultsMapCopy, mismatchedDataString
 }
 
-func validateAsessments(ctx context.Context, debug bool, promptforValidationList []string) map[string]assessmentValidatedData {
-	const goRoutineCount int = 4
+func validateAsessments(ctx context.Context, debug bool, goRoutineCount int, promptforValidationList []string) map[string]assessmentValidatedData {
 	var dataInput []string
 	trackerforValdation := make(chan empty)
 	chanInputsforValidation := make(chan []string)
@@ -603,13 +602,12 @@ func validateAsessments(ctx context.Context, debug bool, promptforValidationList
 	return allValidatedResultsMap
 }
 
-func generateAssessments(ctx context.Context, debug bool, record [][]string) (map[string]assessmentDataforMap, []string) {
+func generateAssessments(ctx context.Context, debug bool, goRoutineCount int, record [][]string) (map[string]assessmentDataforMap, []string) {
 
 	var resultsMap map[string]assessmentDataforMap
 	var promptforValidationList []string
 
 	const assessmentBankCount int = 20
-	const goRoutineCount int = 4
 
 	var profList []string
 
@@ -894,7 +892,7 @@ func main() {
 	*/
 
 	fmt.Println("Generating Assessments Started")
-	resultsMap, promptforValidationList := generateAssessments(ctx, debug, record)
+	resultsMap, promptforValidationList := generateAssessments(ctx, debug, 4, record)
 	fmt.Println("Generating Assessments Done")
 
 	time.Sleep(60 * time.Second)
@@ -906,7 +904,7 @@ func main() {
 	time.Sleep(60 * time.Second)
 
 	fmt.Println("Validating Assessments Started")
-	allValidatedResultsMap := validateAsessments(ctx, debug, promptforValidationList)
+	allValidatedResultsMap := validateAsessments(ctx, debug, 4, promptforValidationList)
 	fmt.Println("Validating Assessments Done")
 
 	time.Sleep(60 * time.Second)
@@ -925,13 +923,17 @@ func main() {
 
 	csvWriteFile(resultsMap, "generatedAssessmentsValidated-1.csv")
 
-	fmt.Println("Validating Assessments Round 2 Started")
+	time.Sleep(60 * time.Second)
+
+	fmt.Println("Validating Assessments Round 2 Prompt Generation")
 	promptforValidationList = nil
 	promptforValidationList = append(promptforValidationList, getPromptRefinedforValidation(mismatchedDataString))
-	fmt.Println("Validating Assessments Round 2 Started")
+	fmt.Println("Validating Assessments Round 2 Prompt Generation Done")
+
+	time.Sleep(60 * time.Second)
 
 	fmt.Println("Validating Assessments Round 2 Started")
-	allValidatedResultsMap = validateAsessments(ctx, debug, promptforValidationList)
+	allValidatedResultsMap = validateAsessments(ctx, debug, 1, promptforValidationList)
 	fmt.Println("Validating Assessments Round 2 Done")
 
 	time.Sleep(60 * time.Second)
@@ -947,6 +949,8 @@ func main() {
 	fmt.Println("Len of Validated List :", len(allValidatedResultsMap), "Len of Map  :", len(resultsMap), " Mismatched :", len(mismatchedDataString))
 	fmt.Println("----------------------------------------------------")
 	fmt.Println("Round 2 Stats")
+
+	time.Sleep(60 * time.Second)
 
 	fmt.Println("Flushing Assessments Started")
 	csvWriteFile(resultsMap, "generatedAssessmentsValidated-2.csv")
