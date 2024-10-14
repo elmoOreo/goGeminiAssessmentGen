@@ -8,7 +8,7 @@ import (
 	"log"
 	"maps"
 	"os"
-	"time"
+	"strings"
 
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
@@ -161,51 +161,12 @@ func getPromptRefined(assessmentBankCount int, proficiency string, complexity st
 
 }
 
-/* func testRun(ctx context.Context, promptString string, goRoute int) *genai.GenerateContentResponse {
-	var llmName string
-
-	if goRoute%2 == 0 {
-		llmName = "gemini-1.5-flash"
-	} else {
-		llmName = "gemini-1.5-flash-8b"
-	}
-
-	// Access your API key as an environment variable (see "Set up your API key" above)
-	client, err := genai.NewClient(ctx, option.WithAPIKey(os.Getenv("GEMINI_API_KEY")))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	model := client.GenerativeModel(llmName)
-	model.ResponseMIMEType = "application/json"
-	const ChatTemperature float32 = 0.0
-	temperature := ChatTemperature
-	model.Temperature = &temperature
-
-	model.SystemInstruction = &genai.Content{
-		Parts: []genai.Part{genai.Text(systemPromptForValidation)},
-	}
-
-	resp, _ := model.GenerateContent(ctx, genai.Text(promptString))
-
-	client.Close()
-
-	return resp
-
-} */
-
 func workerforValidation(ctx context.Context, trackerforValdation chan empty, chanInputs chan []string, geminiResponseforValidation chan *genai.GenerateContentResponse, goRoute int) {
 
 	var llmName string
 	for chanInput := range chanInputs {
 
 		llmName = "gemini-1.5-flash-8b"
-
-		/* 		if goRoute%2 == 0 {
-		   			llmName = "gemini-1.5-flash"
-		   		} else {
-		   			llmName = "gemini-1.5-flash-8b"
-		   		} */
 
 		// Access your API key as an environment variable (see "Set up your API key" above)
 		client, err := genai.NewClient(ctx, option.WithAPIKey(os.Getenv("GEMINI_API_KEY")))
@@ -300,37 +261,6 @@ func worker(ctx context.Context, tracker chan empty, assessmentBankCount int, ch
 
 }
 
-/* func printResponse(debug bool, resp *genai.GenerateContentResponse) {
-
-	for _, cand := range resp.Candidates {
-		if cand.Content != nil {
-			for _, part := range cand.Content.Parts {
-				if txt, ok := part.(genai.Text); ok {
-					if debug {
-						fmt.Println("----------------------------------------------------")
-						fmt.Println(txt)
-						fmt.Println("----------------------------------------------------")
-					}
-					var dataString []assessmentValidatedData
-					if err := json.Unmarshal([]byte(txt), &dataString); err != nil {
-						//log.Fatal(err)
-						fmt.Println(err)
-						continue
-					}
-
-					if debug {
-						fmt.Println("----------------------------------------------------")
-						for idx := 0; idx < len(dataString); idx++ {
-							fmt.Println(dataString[idx].Question, dataString[idx].ValidatedAnswer, dataString[idx].ValidatedReasoning)
-						}
-						fmt.Println("----------------------------------------------------")
-					}
-				}
-			}
-		}
-	}
-} */
-
 func getAllResponseMap(debug bool, resp *genai.GenerateContentResponse) (map[string]assessmentDataforMap, string) {
 
 	resultsMap := make(map[string]assessmentDataforMap)
@@ -401,97 +331,81 @@ func getAllValidatedResponseMap(resp *genai.GenerateContentResponse) map[string]
 	return validatedResultsMap
 }
 
-/* func getAllResponse(resp *genai.GenerateContentResponse) [][]assessmentData {
-
-	var assessmentDataCollection [][]assessmentData
-
-	for _, cand := range resp.Candidates {
-		if cand.Content != nil {
-			for _, part := range cand.Content.Parts {
-				// fmt.Println(part.(genai.Text))
-				if txt, ok := part.(genai.Text); ok {
-					var dataString []assessmentData
-					if err := json.Unmarshal([]byte(txt), &dataString); err != nil {
-						//log.Fatal(err)
-						fmt.Println(err)
-						continue
-					}
-					assessmentDataCollection = append(assessmentDataCollection, dataString)
-				}
-			}
-		}
-	}
-
-	return assessmentDataCollection
-} */
-
-/* func tabWriteFile(assessmentDataCollectionFinal [][]assessmentData) {
-	file, err := os.Create("generatedAssessments.csv")
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-
-	writer := tabwriter.NewWriter(file, 0, 0, 1, ' ', 0)
-
-	sep := "\t"
-
-	fmt.Fprintln(writer, "Subject"+sep+"Topic"+sep+"Proficiency"+sep+"Complexity"+sep+"Question"+sep+"Option1"+sep+"Option2"+sep+"Option3"+sep+"Option4"+sep+"Answer"+sep+"Reasoning"+sep+"Source")
-
-	for outIdx := range assessmentDataCollectionFinal {
-		for inIdx := range assessmentDataCollectionFinal[outIdx] {
-
-			fmt.Fprintln(writer,
-				assessmentDataCollectionFinal[outIdx][inIdx].Subject+sep+assessmentDataCollectionFinal[outIdx][inIdx].Topic+sep+
-					assessmentDataCollectionFinal[outIdx][inIdx].Proficiency+sep+assessmentDataCollectionFinal[outIdx][inIdx].Complexity+sep+
-					assessmentDataCollectionFinal[outIdx][inIdx].Question+sep+assessmentDataCollectionFinal[outIdx][inIdx].AllOptions[0]+sep+
-					assessmentDataCollectionFinal[outIdx][inIdx].AllOptions[1]+sep+assessmentDataCollectionFinal[outIdx][inIdx].AllOptions[2]+sep+
-					assessmentDataCollectionFinal[outIdx][inIdx].AllOptions[3]+sep+assessmentDataCollectionFinal[outIdx][inIdx].Answer+sep+
-					assessmentDataCollectionFinal[outIdx][inIdx].Reasoning+sep+assessmentDataCollectionFinal[outIdx][inIdx].Source)
-		}
-	}
-
-	writer.Flush()
-} */
-
-func csvWriteFile(resultsMap map[string]assessmentDataforMap, fileName string) {
+func mergeFiles(fileName string) {
 
 	file, err := os.Create(fileName)
 
+	var dataStringSlice, validatedAssessmentfileName string
+
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
-
-	writer := csv.NewWriter(file)
-	writer.Comma = ';'
-
-	defer writer.Flush()
-
-	var allDataStringSlice [][]string
 	sep := ";"
 
-	dataStringSlice := []string{"Subject" + sep + "Topic" + sep + "Proficiency" + sep + "Complexity" + sep +
+	dataStringSlice = "Subject" + sep + "Topic" + sep + "Proficiency" + sep + "Complexity" + sep +
 		"Question" + sep + "Option1" + sep + "Option2" + sep + "Option3" + sep + "Option4" + sep + "Answer" + sep +
-		"Reasoning" + sep + "Source" + sep + "LLMName" + sep + "ValidatedAnswer" + sep + "ValidatedReasoning" + sep + "ValidatedSelectedLLM"}
+		"Reasoning" + sep + "Source" + sep + "LLMName" + sep + "ValidatedAnswer" + sep + "ValidatedReasoning" + sep + "ValidatedSelectedLLM" + "\n"
 
-	allDataStringSlice = append(allDataStringSlice, dataStringSlice)
+	file.WriteString(dataStringSlice)
+
+	csvfile, err := os.Open("TopicsforAssessmentGeneration.csv")
+	if err != nil {
+		log.Fatalln("Couldn't open the csv file", err)
+	}
+	defer csvfile.Close()
+
+	// Parse the file
+	r := csv.NewReader(csvfile)
+
+	record, _ := r.ReadAll()
+
+	for recordIteration := range record {
+
+		validatedAssessmentfileName = record[recordIteration][0] + "-" + record[recordIteration][1] + "-" + "ValidatedAssessment.csv"
+
+		content, _ := os.ReadFile(validatedAssessmentfileName)
+
+		lines := strings.Split(string(content), "\n")
+
+		for idx := range lines {
+			if len(lines[idx]) > 0 {
+				file.WriteString(lines[idx] + "\n")
+			}
+		}
+
+	}
+
+	file.Sync()
+
+}
+
+func csvWriteStringFile(resultsMap map[string]assessmentDataforMap, fileName string) {
+
+	file, err := os.Create(fileName)
+
+	var dataStringSlice string
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	sep := ";"
 
 	for _, v := range resultsMap {
 
-		dataStringSlice := []string{v.Subject + sep + v.Topic + sep +
+		dataStringSlice = v.Subject + sep + v.Topic + sep +
 			v.Proficiency + sep + v.Complexity + sep +
 			v.Question + sep + v.AllOptions[0] + sep +
 			v.AllOptions[1] + sep + v.AllOptions[2] + sep +
 			v.AllOptions[3] + sep + v.Answer + sep +
 			v.Reasoning + sep + v.Source + sep +
-			v.LLMName + sep + v.ValidatedAnswer + sep + v.ValidatedReasoning + sep + v.ValidatedSelectedLLM}
+			v.LLMName + sep + v.ValidatedAnswer + sep + v.ValidatedReasoning + sep + v.ValidatedSelectedLLM + "\n"
 
-		allDataStringSlice = append(allDataStringSlice, dataStringSlice)
+		file.WriteString(dataStringSlice)
 	}
 
-	writer.WriteAll(allDataStringSlice)
+	file.Sync()
 
 }
 
@@ -604,6 +518,8 @@ func validateAsessments(ctx context.Context, debug bool, goRoutineCount int, pro
 	}
 	close(geminiResponseforValidation)
 
+	<-trackerforValdation
+
 	return allValidatedResultsMap
 }
 
@@ -612,7 +528,7 @@ func generateAssessments(ctx context.Context, debug bool, goRoutineCount int, re
 	var resultsMap map[string]assessmentDataforMap
 	var promptforValidationList []string
 
-	const assessmentBankCount int = 20
+	const assessmentBankCount int = 3
 
 	var profList []string
 
@@ -682,6 +598,8 @@ func generateAssessments(ctx context.Context, debug bool, goRoutineCount int, re
 	}
 	close(geminiResponse)
 
+	<-tracker
+
 	if debug {
 		fmt.Println("----------------------------------------------------")
 		fmt.Println("promptforValidationList:", len(promptforValidationList))
@@ -698,6 +616,11 @@ func main() {
 
 	// var sleepSeconds int = 60
 
+	var assessmentfileName string
+	var validatedAssessmentfileName string
+	var dataRecord [][]string
+	var mergedFileName string
+
 	ctx := context.Background()
 
 	csvfile, err := os.Open("TopicsforAssessmentGeneration.csv")
@@ -711,250 +634,49 @@ func main() {
 
 	record, _ := r.ReadAll()
 
-	/* 	var resultsMap map[string]assessmentDataforMap
-	   	var promptforValidationList []string
-	   	const assessmentBankCount int = 20
-	   	const goRoutineCount int = 8
-	   	var profList []string
+	for recordIteration := range record {
+		dataRecord = nil
 
-	   	profList = nil
-	   	profList = append(profList, "Learner")
-	   	profList = append(profList, "Practitioner")
-	   	profList = append(profList, "Specialist")
+		mergedFileName = record[recordIteration][0]
 
-	   	var complexityList []string
+		dataRecord = append(dataRecord, record[recordIteration])
 
-	   	complexityList = nil
-	   	complexityList = append(complexityList, "Easy")
-	   	complexityList = append(complexityList, "Medium")
-	   	complexityList = append(complexityList, "Difficult")
+		assessmentfileName = record[recordIteration][0] + "-" + record[recordIteration][1] + "-" + "Assessment.csv"
+		validatedAssessmentfileName = record[recordIteration][0] + "-" + record[recordIteration][1] + "-" + "ValidatedAssessment.csv"
 
-	   	geminiResponse := make(chan *genai.GenerateContentResponse)
+		fmt.Println("Generating Assessments Started")
+		resultsMap, promptforValidationList := generateAssessments(ctx, debug, 4, dataRecord)
+		fmt.Println("Generating Assessments Done")
 
-	   	// begin Implementation 2
+		// time.Sleep(60 * time.Second)
 
-	   	tracker := make(chan empty)
-	   	chanInputs := make(chan []string)
-	   	var dataInput []string
+		fmt.Println("Flushing Assessments Started")
+		csvWriteStringFile(resultsMap, assessmentfileName)
+		fmt.Println("Flushing Assessments Done")
 
-	   	// Create the jobs
-	   	for i := 0; i < goRoutineCount; i++ {
-	   		go worker(ctx, tracker, assessmentBankCount, chanInputs, geminiResponse, i)
-	   	}
+		// time.Sleep(60 * time.Second)
 
-	   	//get the completions
-	   	go func() {
-	   		for r := range geminiResponse {
-	   			// printResponse(r)
-	   			// results = append(results, r)
+		fmt.Println("Validating Assessments Started")
+		allValidatedResultsMap := validateAsessments(ctx, debug, 4, promptforValidationList)
+		fmt.Println("Validating Assessments Done")
 
-	   			rMap, promptforValidation := getAllResponseMap(debug, r)
+		// time.Sleep(60 * time.Second)
 
-	   			promptforValidationList = append(promptforValidationList, promptforValidation)
+		fmt.Println("Updating Maps Started")
+		resultsMap, mismatchedDataString := updateMaps(debug, resultsMap, allValidatedResultsMap)
+		fmt.Println("Updating Maps Done")
 
-	   			if resultsMap == nil {
-	   				resultsMap = maps.Clone(rMap)
-	   			} else {
-	   				maps.Copy(resultsMap, rMap)
-	   			}
-	   		}
-	   		var e empty
-	   		tracker <- e
-	   	}()
+		// time.Sleep(60 * time.Second)
 
-	   	for idx := range profList {
-
-	   		for cidx := range complexityList {
-
-	   			for recordIteration := range record {
-	   				dataInput = nil
-	   				dataInput = append(dataInput, profList[idx])
-	   				dataInput = append(dataInput, complexityList[cidx])
-	   				dataInput = append(dataInput, record[recordIteration][0])
-	   				dataInput = append(dataInput, record[recordIteration][1])
-
-	   				chanInputs <- dataInput
-	   			}
-	   		}
-
-	   	}
-
-	   	close(chanInputs)
-	   	for i := 0; i < goRoutineCount; i++ {
-	   		<-tracker
-	   	}
-	   	close(geminiResponse)
-
-	   	if debug {
-	   		fmt.Println("----------------------------------------------------")
-	   		fmt.Println("promptforValidationList:", len(promptforValidationList))
-	   		fmt.Println("----------------------------------------------------")
-	   	} */
-
-	/* const goRoutineCount int = 4
-	var dataInput []string
-	trackerforValdation := make(chan empty)
-	chanInputsforValidation := make(chan []string)
-	geminiResponseforValidation := make(chan *genai.GenerateContentResponse)
-	var allValidatedResultsMap map[string]assessmentValidatedData
-
-	// Create the jobs
-	for i := 0; i < goRoutineCount; i++ {
-		go workerforValidation(ctx, trackerforValdation, chanInputsforValidation, geminiResponseforValidation, i)
-	}
-
-	//get the completions
-	go func() {
-		for r := range geminiResponseforValidation {
-			rvMap := getAllValidatedResponseMap(r)
-
-			if allValidatedResultsMap == nil {
-				allValidatedResultsMap = maps.Clone(rvMap)
-			} else {
-				maps.Copy(allValidatedResultsMap, rvMap)
-			}
-		}
-		var e empty
-		trackerforValdation <- e
-	}()
-
-	for pidx := range promptforValidationList {
-		dataInput = nil
-
-		dataInput = append(dataInput, promptforValidationList[pidx])
-
-		chanInputsforValidation <- dataInput
-	}
-
-	close(chanInputsforValidation)
-	for i := 0; i < goRoutineCount; i++ {
-		<-trackerforValdation
-	}
-	close(geminiResponseforValidation)
-
-	if debug {
+		fmt.Println("Round 1 Stats")
 		fmt.Println("----------------------------------------------------")
-		fmt.Println("Len of Validated List :", len(allValidatedResultsMap), "Len of Map  :", len(resultsMap))
+		fmt.Println("Len of Validated List :", len(allValidatedResultsMap), "Len of Map  :", len(resultsMap), " Mismatched :", len(mismatchedDataString))
 		fmt.Println("----------------------------------------------------")
-	} */
+		fmt.Println("Round 1 Stats")
 
-	/* var mismatchedDataString []assessmentDataforMap
-	var localAssessmentDataforMap assessmentDataforMap
-	correctAnswer := 0
-	doesNotMatch := 0
-	matchFound := false
-
-	for kout, vout := range resultsMap {
-		localAssessmentDataforMap = vout
-
-		for kin, vin := range allValidatedResultsMap {
-			if kin == kout {
-				matchFound = true
-
-				localAssessmentDataforMap.ValidatedAnswer = vin.ValidatedAnswer
-				localAssessmentDataforMap.ValidatedReasoning = vin.ValidatedReasoning
-				localAssessmentDataforMap.ValidatedSelectedLLM = "gemini-1.5-flash-8b"
-
-				resultsMap[kout] = localAssessmentDataforMap
-
-				if localAssessmentDataforMap.ValidatedAnswer == localAssessmentDataforMap.Answer {
-					correctAnswer++
-				} else {
-					mismatchedDataString = append(mismatchedDataString, localAssessmentDataforMap)
-					if debug {
-						fmt.Println("----------------------------------------------------")
-						fmt.Println("Question")
-						fmt.Println("----------------------------------------------------")
-						fmt.Println(vout.Question)
-						fmt.Println("----------------------------------------------------")
-						fmt.Println(vout.ValidatedAnswer, vout.Answer)
-						fmt.Println("----------------------------------------------------")
-						fmt.Println(vout.ValidatedReasoning)
-						fmt.Println("----------------------------------------------------")
-						fmt.Println(vout.Reasoning)
-						fmt.Println("----------------------------------------------------")
-					}
-				}
-
-				continue
-			}
-		}
-
-		if !matchFound {
-			mismatchedDataString = append(mismatchedDataString, localAssessmentDataforMap)
-
-			doesNotMatch++
-		}
-
-		matchFound = false
+		csvWriteStringFile(resultsMap, validatedAssessmentfileName)
 	}
 
-	if debug {
-		fmt.Println("----------------------------------------------------")
-		fmt.Println("Correct Anwers :", correctAnswer, " Total :", len(resultsMap), "  No Match : ", doesNotMatch, " Mismatched :", len(mismatchedDataString))
-		fmt.Println("----------------------------------------------------")
-	}
-	*/
-
-	fmt.Println("Generating Assessments Started")
-	resultsMap, promptforValidationList := generateAssessments(ctx, debug, 4, record)
-	fmt.Println("Generating Assessments Done")
-
-	time.Sleep(60 * time.Second)
-
-	fmt.Println("Flushing Assessments Started")
-	csvWriteFile(resultsMap, "generatedAssessments.csv")
-	fmt.Println("Flushing Assessments Done")
-
-	time.Sleep(60 * time.Second)
-
-	fmt.Println("Validating Assessments Started")
-	allValidatedResultsMap := validateAsessments(ctx, debug, 4, promptforValidationList)
-	fmt.Println("Validating Assessments Done")
-
-	time.Sleep(60 * time.Second)
-
-	fmt.Println("Updating Maps Started")
-	resultsMap, mismatchedDataString := updateMaps(debug, resultsMap, allValidatedResultsMap)
-	fmt.Println("Updating Maps Done")
-
-	time.Sleep(60 * time.Second)
-
-	fmt.Println("Round 1 Stats")
-	fmt.Println("----------------------------------------------------")
-	fmt.Println("Len of Validated List :", len(allValidatedResultsMap), "Len of Map  :", len(resultsMap), " Mismatched :", len(mismatchedDataString))
-	fmt.Println("----------------------------------------------------")
-	fmt.Println("Round 1 Stats")
-
-	csvWriteFile(resultsMap, "generatedAssessmentsValidated-1.csv")
-
-	time.Sleep(60 * time.Second)
-
-	fmt.Println("Validating Assessments Round 2 Prompt Generation")
-	promptforValidationList = nil
-	promptforValidationList = append(promptforValidationList, getPromptRefinedforValidation(mismatchedDataString))
-	fmt.Println("Validating Assessments Round 2 Prompt Generation Done")
-
-	fmt.Println("Validating Assessments Round 2 Started")
-	allValidatedResultsMap = validateAsessments(ctx, debug, 1, promptforValidationList)
-	fmt.Println("Validating Assessments Round 2 Done")
-
-	time.Sleep(60 * time.Second)
-
-	fmt.Println("Updating Maps Round 2 Started")
-	resultsMap, mismatchedDataString = updateMaps(debug, resultsMap, allValidatedResultsMap)
-	fmt.Println("Updating Maps Round 2 Done")
-
-	fmt.Println("Round 2 Stats")
-	fmt.Println("----------------------------------------------------")
-	fmt.Println("Len of Validated List :", len(allValidatedResultsMap), "Len of Map  :", len(resultsMap), " Mismatched :", len(mismatchedDataString))
-	fmt.Println("----------------------------------------------------")
-	fmt.Println("Round 2 Stats")
-
-	time.Sleep(60 * time.Second)
-
-	fmt.Println("Flushing Assessments Started")
-	csvWriteFile(resultsMap, "generatedAssessmentsValidated-2.csv")
-	fmt.Println("Flushing Assessments Done")
+	mergeFiles(mergedFileName + "-" + "Validated.csv")
 
 }

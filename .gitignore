@@ -1,4 +1,6 @@
 _main.go
+__main.go
+___main.go
 *.csv
 *.sum
 *.mod
